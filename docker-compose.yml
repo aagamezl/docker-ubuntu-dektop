@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  ubuntu-gnome:
+    build: .
+    container_name: ubuntu-gnome-rdp
+    ports:
+      - "3389:3389"
+    volumes:
+      - ./data:/home/dockeruser/data
+    security_opt:
+      - seccomp=unconfined
+    cap_add:
+      - SYS_ADMIN
+    tmpfs:
+      - /tmp
+      - /run
+      - /run/lock
+    tty: true
+    stdin_open: true
