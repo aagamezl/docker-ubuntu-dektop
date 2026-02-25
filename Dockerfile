@@ -16,7 +16,7 @@ RUN apt-get update && \
 
 # Install GNOME, XRDP, and optional SSH for X11 forwarding
 RUN apt-get update && \
-    apt-get install -y dbus-x11 xrdp sudo openssl gnome-shell ubuntu-desktop-minimal gnome-console && \
+    apt-get install -y dbus-x11 xrdp sudo openssl gnome-shell ubuntu-desktop-minimal gnome-console bash-completion && \
     if [ "$X11Forwarding" = "true" ]; then apt-get install -y openssh-server; fi && \
     apt-get autoremove -y --purge && \
     apt-get clean
@@ -32,6 +32,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Add to your Dockerfile after Chrome installation
+RUN echo 'exec -a "$0" "$HERE/chrome" "$@" --no-sandbox --disable-dev-shm-usage' > /usr/bin/google-chrome && \
+    chmod +x /usr/bin/google-chrome
+
 # Remove the reboot required file
 RUN rm -f /run/reboot-required* || true
 
@@ -46,10 +50,26 @@ RUN echo 'LANG=en_US.UTF-8' >> /etc/default/locale && \
     echo 'export XDG_CURRENT_DESKTOP=ubuntu:GNOME' >> /home/$USER/.xsessionrc && \
     echo 'export XDG_SESSION_TYPE=x11' >> /home/$USER/.xsessionrc
 
-# Enable console logs and optimize XRDP performance
-RUN sed -i "s/#EnableConsole=false/EnableConsole=true/g" /etc/xrdp/xrdp.ini && \
-    sed -i 's/max_bpp=32/max_bpp=16/g' /etc/xrdp/xrdp.ini && \
-    gsettings set org.gnome.desktop.interface enable-animations true
+# Optimize XRDP performance
+RUN sed -i \
+    -e "s/#EnableConsole=false/EnableConsole=true/g" \
+    -e 's/max_bpp=32/max_bpp=16/g' \
+    -e 's/use_compression=.*/use_compression=false/g' \
+    -e 's/recv_is_slow=.*/recv_is_slow=1/g' \
+    -e 's/tcp_send_buffer_bytes=.*/tcp_send_buffer_bytes=4194304/g' \
+    -e 's/tcp_recv_buffer_bytes=.*/tcp_recv_buffer_bytes=6291456/g' \
+    -e 's/bitmap_compression=.*/bitmap_compression=false/g' \
+    /etc/xrdp/xrdp.ini && \
+    \
+    # Disable unnecessary GNOME animations and effects
+    gsettings set org.gnome.desktop.interface enable-animations false && \
+    gsettings set org.gnome.desktop.background show-desktop-icons false && \
+    gsettings set org.gnome.desktop.interface enable-hot-corners false && \
+    \
+    # Optimize GNOME shell performance
+    echo "export CLUTTER_DEFAULT_FPS=30" >> /etc/environment && \
+    echo "export CLUTTER_PAINT=disable-culling" >> /etc/environment && \
+    echo "export CLUTTER_VBLANK=none" >> /etc/environment
 
 # Configure SSH for X11 forwarding
 RUN if [ "$X11Forwarding" = "true" ]; then \
